@@ -15,7 +15,6 @@ import (
 )
 
 type User struct {
-	// On ajoute le tag json pour correspondre aux colonnes Supabase
 	ID       int    `json:"id,omitempty" gorm:"primaryKey"`
 	Username string `json:"username"`
 	Email    string `json:"email"`
