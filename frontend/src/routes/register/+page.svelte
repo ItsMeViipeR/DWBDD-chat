@@ -24,7 +24,7 @@
 			const result = await response.json();
 
 			if (response.ok) {
-				alert('Succès : ' + result.message);
+				window.location.href = '/login';
 			} else {
 				alert('Erreur : ' + (result.error || "Échec de l'inscription"));
 			}
