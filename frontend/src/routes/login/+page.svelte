@@ -1,7 +1,14 @@
 <script lang="ts">
+	import { isTokenExpired } from '$lib/isTokenExpired';
+
 	let email = $state('');
 	let password = $state('');
 	let errorMessage = $state('');
+	let token = localStorage.getItem('chat_token');
+
+	if (token && !isTokenExpired(token)) {
+		window.location.href = '/';
+	}
 
 	async function loginUser(e: Event) {
 		e.preventDefault();
