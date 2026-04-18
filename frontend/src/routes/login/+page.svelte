@@ -76,7 +76,7 @@
 			type="submit"
 			class="w-full rounded bg-blue-600 py-2 text-white transition hover:bg-blue-700"
 		>
-			Sign Up
+			Sign In
 		</button>
 	</form>
 </div>
