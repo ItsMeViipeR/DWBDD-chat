@@ -14,15 +14,10 @@ A simple forum for "Développement Web et Bases de Données" course at "Universi
 
 To start the forum, you need to start client server and backend server
 
-```
-cd api
-go run .
+```sh
+docker compose up
 ```
 
-```sh
-cd frontend
-npm run dev
-```
 ## Environment Variables
 
 To run this project, you will need to add the following environment variables to your .env file in `api/`
