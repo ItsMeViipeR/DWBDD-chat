@@ -147,6 +147,60 @@ func main() {
 		})
 	})
 
+	r.GET("/api/user", func(c *gin.Context) {
+
+	})
+
+	r.POST("/api/change_email", func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token manquant"})
+			return
+		}
+
+		token, err := jwt.Parse(authHeader, func(token *jwt.Token) (interface{}, error) {
+			return []byte(os.Getenv("JWT_SECRET")), nil
+		})
+
+		if err != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token invalide"})
+			return
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la lecture des claims"})
+			return
+		}
+
+		userID := int(claims["user_id"].(float64))
+
+		var input struct {
+			Email string `json:"email" binding:"required,email"`
+		}
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Format d'email invalide"})
+			return
+		}
+
+		var updatedUsers []User
+
+		_, err = client.From("users").Update(map[string]interface{}{"email": input.Email}, "", "").Eq("id", fmt.Sprintf("%d", userID)).ExecuteTo(&updatedUsers)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la mise à jour de l'email"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message":   "Email mis à jour avec succès",
+			"new_email": updatedUsers[0].Email,
+		})
+	})
+
 	r.GET("/api/messages", func(c *gin.Context) {
 
 	})
