@@ -130,6 +130,7 @@ func main() {
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"user_id":  dbUser.ID,
 			"username": dbUser.Username,
+			"email":    dbUser.Email,
 			"exp":      time.Now().Add(time.Hour * 72).Unix(),
 		})
 
