@@ -61,7 +61,14 @@ func main() {
 
 	r := gin.Default()
 
-	r.Use(cors.Default())
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	r.POST("/api/register", func(c *gin.Context) {
 		var input RegisterInput
@@ -130,6 +137,7 @@ func main() {
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"user_id":  dbUser.ID,
 			"username": dbUser.Username,
+			"email":    dbUser.Email,
 			"exp":      time.Now().Add(time.Hour * 72).Unix(),
 		})
 
@@ -144,6 +152,79 @@ func main() {
 			"message": "Connexion réussie",
 			"token":   tokenString,
 			"user":    dbUser.Username,
+		})
+	})
+
+	r.GET("/api/user", func(c *gin.Context) {
+
+	})
+
+	r.POST("/api/change_email", func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+
+		if len(authHeader) < 8 || authHeader[:7] != "Bearer " {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Format de token invalide (Bearer manquant)"})
+			return
+		}
+
+		tokenString := authHeader[7:]
+
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("méthode de signature inattendue : %v", token.Header["alg"])
+			}
+			return []byte(os.Getenv("JWT_SECRET")), nil
+		})
+
+		if err != nil || !token.Valid {
+			fmt.Println("Erreur JWT:", err)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token invalide"})
+			return
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la lecture des claims"})
+			return
+		}
+
+		userID := int(claims["user_id"].(float64))
+
+		var input struct {
+			Email string `json:"email" binding:"required,email"`
+		}
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Format d'email invalide"})
+			fmt.Println("c: ", c)
+			return
+		}
+
+		var updatedUsers []User
+
+		_, err = client.From("users").Update(map[string]any{"email": input.Email}, "", "").Eq("id", fmt.Sprintf("%d", userID)).ExecuteTo(&updatedUsers)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la mise à jour de l'email"})
+			return
+		}
+
+		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+			"user_id": userID,
+			"email":   updatedUsers[0].Email,
+		})
+		newTokenString, err := newToken.SignedString([]byte(os.Getenv("JWT_SECRET")))
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la génération du token"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message":   "Email mis à jour avec succès",
+			"new_email": updatedUsers[0].Email,
+			"token":     newTokenString,
 		})
 	})
 
