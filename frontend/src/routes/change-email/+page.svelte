@@ -17,6 +17,7 @@
 
 	const decoded = jwtDecode<Token>(chat_token!);
 	const email = decoded.email;
+	const username = decoded.username;
 
 	let new_email = $state(email);
 	let message = $state('');
@@ -40,6 +41,7 @@
 
 			if (response.ok) {
 				localStorage.setItem('chat_token', data.token);
+				localStorage.setItem('chat_user', username);
 				message = 'Email modifié avec succès';
 			} else {
 				message = data.error || "Erreur lors de la modification de l'email";
