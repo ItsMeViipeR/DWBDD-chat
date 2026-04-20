@@ -61,7 +61,14 @@ func main() {
 
 	r := gin.Default()
 
-	r.Use(cors.Default())
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	r.POST("/api/register", func(c *gin.Context) {
 		var input RegisterInput
@@ -155,16 +162,22 @@ func main() {
 	r.POST("/api/change_email", func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token manquant"})
+		if len(authHeader) < 8 || authHeader[:7] != "Bearer " {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Format de token invalide (Bearer manquant)"})
 			return
 		}
 
-		token, err := jwt.Parse(authHeader, func(token *jwt.Token) (any, error) {
+		tokenString := authHeader[7:]
+
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("méthode de signature inattendue : %v", token.Header["alg"])
+			}
 			return []byte(os.Getenv("JWT_SECRET")), nil
 		})
 
 		if err != nil || !token.Valid {
+			fmt.Println("Erreur JWT:", err)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token invalide"})
 			return
 		}
@@ -184,6 +197,7 @@ func main() {
 
 		if err := c.ShouldBindJSON(&input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Format d'email invalide"})
+			fmt.Println("c: ", c)
 			return
 		}
 
@@ -196,9 +210,21 @@ func main() {
 			return
 		}
 
+		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+			"user_id": userID,
+			"email":   updatedUsers[0].Email,
+		})
+		newTokenString, err := newToken.SignedString([]byte(os.Getenv("JWT_SECRET")))
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la génération du token"})
+			return
+		}
+
 		c.JSON(http.StatusOK, gin.H{
 			"message":   "Email mis à jour avec succès",
 			"new_email": updatedUsers[0].Email,
+			"token":     newTokenString,
 		})
 	})
 
