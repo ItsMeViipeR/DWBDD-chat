@@ -6,54 +6,17 @@ import (
 	"os"
 	"time"
 
+	"github.com/ItsMeViipeR/DWBDD-chat/api/types"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
-	"github.com/joho/godotenv"
-	"github.com/supabase-community/supabase-go"
 	"golang.org/x/crypto/bcrypt"
 )
-
-type User struct {
-	ID       int    `json:"id,omitempty" gorm:"primaryKey"`
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type Message struct {
-	ID        int       `gorm:"primaryKey"`
-	Content   string    `json:"content"`
-	UserID    int       `json:"user_id"`
-	User      User      `json:"user"`
-	CreatedAt time.Time `json:"created_at"`
-}
 
 type RegisterInput struct {
 	Name     string `json:"name" binding:"required"`
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
-}
-
-var client *supabase.Client
-
-func initDB() {
-	err := godotenv.Load()
-
-	if err != nil {
-		fmt.Println("Erreur chargement .env:", err)
-		return
-	}
-
-	supabaseURL := os.Getenv("SUPABASE_URL")
-	supabaseKey := os.Getenv("SUPABASE_KEY")
-
-	client, err = supabase.NewClient(supabaseURL, supabaseKey, nil)
-
-	if err != nil {
-		fmt.Println("Erreur init Supabase:", err)
-		return
-	}
 }
 
 func main() {
@@ -84,13 +47,13 @@ func main() {
 			return
 		}
 
-		newUser := User{
+		newUser := types.User{
 			Username: input.Name,
 			Email:    input.Email,
 			Password: string(hash),
 		}
 
-		var result []User
+		var result []types.User
 
 		_, err = client.From("users").Insert(newUser, false, "", "", "").ExecuteTo(&result)
 
@@ -117,7 +80,7 @@ func main() {
 			return
 		}
 
-		var users []User
+		var users []types.User
 		_, err := client.From("users").Select("*", "exact", false).Eq("email", input.Email).ExecuteTo(&users)
 
 		if err != nil || len(users) == 0 {
@@ -201,7 +164,7 @@ func main() {
 			return
 		}
 
-		var updatedUsers []User
+		var updatedUsers []types.User
 
 		_, err = client.From("users").Update(map[string]any{"email": input.Email}, "", "").Eq("id", fmt.Sprintf("%d", userID)).ExecuteTo(&updatedUsers)
 
