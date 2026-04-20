@@ -240,5 +240,63 @@ func main() {
 		c.JSON(http.StatusCreated, gin.H{"message": "Topic créé avec succès", "topic": result[0]})
 	})
 
+	r.POST("/api/messages", func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+
+		if len(authHeader) < 8 {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token manquant"})
+			return
+		}
+
+		tokenString := authHeader[7:]
+
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
+			return []byte(os.Getenv("JWT_SECRET")), nil
+		})
+
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token invalide"})
+			return
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+
+		if !ok || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token invalide"})
+			return
+		}
+
+		userID := int64(claims["user_id"].(float64))
+
+		var input types.CreateMessageInput
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		newMessage := types.Message{
+			Content: input.Content,
+			UserID:  userID,
+			TopicID: input.TopicID,
+		}
+
+		var result []types.Message
+
+		_, dbErr := client.From("messages").Insert(newMessage, false, "", "", "").ExecuteTo(&result)
+
+		if dbErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": dbErr.Error()})
+			return
+		}
+
+		if len(result) == 0 {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la récupération du message créé"})
+			return
+		}
+
+		c.JSON(http.StatusCreated, gin.H{"message": "Message créé avec succès", "created_message": result[0]})
+	})
+
 	r.Run(":8080")
 }
