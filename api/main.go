@@ -159,7 +159,7 @@ func main() {
 			return
 		}
 
-		token, err := jwt.Parse(authHeader, func(token *jwt.Token) (interface{}, error) {
+		token, err := jwt.Parse(authHeader, func(token *jwt.Token) (any, error) {
 			return []byte(os.Getenv("JWT_SECRET")), nil
 		})
 
@@ -188,7 +188,7 @@ func main() {
 
 		var updatedUsers []User
 
-		_, err = client.From("users").Update(map[string]interface{}{"email": input.Email}, "", "").Eq("id", fmt.Sprintf("%d", userID)).ExecuteTo(&updatedUsers)
+		_, err = client.From("users").Update(map[string]any{"email": input.Email}, "", "").Eq("id", fmt.Sprintf("%d", userID)).ExecuteTo(&updatedUsers)
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la mise à jour de l'email"})
