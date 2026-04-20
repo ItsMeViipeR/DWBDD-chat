@@ -27,3 +27,9 @@ To run this project, you will need to add the following environment variables to
 `SUPABASE_KEY`
 
 `JWT_SECRET`
+
+## Contributing
+
+Contributions are always welcome!
+
+See `CONTRIBUTING.md` for ways to get started.
