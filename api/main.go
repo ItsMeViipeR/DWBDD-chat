@@ -10,6 +10,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
+	"github.com/supabase-community/postgrest-go"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -296,6 +297,26 @@ func main() {
 		}
 
 		c.JSON(http.StatusCreated, gin.H{"message": "Message créé avec succès", "created_message": result[0]})
+	})
+
+	r.GET("/api/messages", func(c *gin.Context) {
+		var input types.GetMessagesInput
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var result []types.Message
+
+		_, dbErr := client.From("messages").Select("*, user:users(id, username)", "exact", false).Eq("topic_id", fmt.Sprintf("%d", input.TopicID)).Order("created_at", &postgrest.OrderOpts{Ascending: true}).ExecuteTo(&result)
+
+		if dbErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": dbErr.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"messages": result})
 	})
 
 	r.Run(":8080")
