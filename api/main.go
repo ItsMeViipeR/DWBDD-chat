@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net/http"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -25,6 +24,7 @@ func main() {
 	r.POST("/api/register", RegisterHandler)
 	r.POST("/api/login", LoginHandler)
 	r.GET("/api/messages", GetMessagesHandler)
+	r.GET("/api/topics", GetTopicsHandler)
 
 	authGroup := r.Group("/api")
 
@@ -35,18 +35,6 @@ func main() {
 		authGroup.POST("/change_email", CreateEmailHandler)
 		authGroup.POST("/topics", CreateTopicHandler)
 	}
-
-	r.GET("/api/topics", func(c *gin.Context) {
-		var result []map[string]any
-		_, dbErr := client.From("topics").Select("*", "exact", false).ExecuteTo(&result)
-
-		if dbErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": dbErr.Error()})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{"topics": result})
-	})
 
 	r.Run(":8080")
 }
