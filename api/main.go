@@ -34,6 +34,15 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	authGroup := r.Group("/api")
+
+	authGroup.Use(AuthMiddleware())
+	{
+		authGroup.DELETE("/messages/:id", DeleteMessageHandler)
+		authGroup.POST("/messages", CreateMessageHandler)
+		authGroup.POST("/change_email", CreateEmailHandler)
+	}
+
 	r.POST("/api/register", func(c *gin.Context) {
 		var input RegisterInput
 
@@ -119,75 +128,6 @@ func main() {
 		})
 	})
 
-	r.POST("/api/change_email", func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-
-		if len(authHeader) < 8 || authHeader[:7] != "Bearer " {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Format de token invalide (Bearer manquant)"})
-			return
-		}
-
-		tokenString := authHeader[7:]
-
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("méthode de signature inattendue : %v", token.Header["alg"])
-			}
-			return []byte(os.Getenv("JWT_SECRET")), nil
-		})
-
-		if err != nil || !token.Valid {
-			fmt.Println("Erreur JWT:", err)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token invalide"})
-			return
-		}
-
-		claims, ok := token.Claims.(jwt.MapClaims)
-
-		if !ok {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la lecture des claims"})
-			return
-		}
-
-		userID := int(claims["user_id"].(float64))
-
-		var input struct {
-			Email string `json:"email" binding:"required,email"`
-		}
-
-		if err := c.ShouldBindJSON(&input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Format d'email invalide"})
-			fmt.Println("c: ", c)
-			return
-		}
-
-		var updatedUsers []types.User
-
-		_, err = client.From("users").Update(map[string]any{"email": input.Email}, "", "").Eq("id", fmt.Sprintf("%d", userID)).ExecuteTo(&updatedUsers)
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la mise à jour de l'email"})
-			return
-		}
-
-		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"user_id": userID,
-			"email":   updatedUsers[0].Email,
-		})
-		newTokenString, err := newToken.SignedString([]byte(os.Getenv("JWT_SECRET")))
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la génération du token"})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"message":   "Email mis à jour avec succès",
-			"new_email": updatedUsers[0].Email,
-			"token":     newTokenString,
-		})
-	})
-
 	r.POST("/api/topics", func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 
@@ -241,64 +181,6 @@ func main() {
 		c.JSON(http.StatusCreated, gin.H{"message": "Topic créé avec succès", "topic": result[0]})
 	})
 
-	r.POST("/api/messages", func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-
-		if len(authHeader) < 8 {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token manquant"})
-			return
-		}
-
-		tokenString := authHeader[7:]
-
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
-			return []byte(os.Getenv("JWT_SECRET")), nil
-		})
-
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token invalide"})
-			return
-		}
-
-		claims, ok := token.Claims.(jwt.MapClaims)
-
-		if !ok || !token.Valid {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token invalide"})
-			return
-		}
-
-		userID := int64(claims["user_id"].(float64))
-
-		var input types.CreateMessageInput
-
-		if err := c.ShouldBindJSON(&input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		newMessage := types.Message{
-			Content: input.Content,
-			UserID:  userID,
-			TopicID: input.TopicID,
-		}
-
-		var result []types.Message
-
-		_, dbErr := client.From("messages").Insert(newMessage, false, "", "", "").ExecuteTo(&result)
-
-		if dbErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": dbErr.Error()})
-			return
-		}
-
-		if len(result) == 0 {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la récupération du message créé"})
-			return
-		}
-
-		c.JSON(http.StatusCreated, gin.H{"message": "Message créé avec succès", "created_message": result[0]})
-	})
-
 	r.GET("/api/messages", func(c *gin.Context) {
 		var input types.GetMessagesInput
 		if err := c.ShouldBindQuery(&input); err != nil {
@@ -335,57 +217,6 @@ func main() {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"messages": result})
-	})
-
-	r.DELETE("/api/messages/:id", func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-
-		if len(authHeader) < 8 || authHeader[:7] != "Bearer " {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Format de token invalide (Bearer manquant)"})
-			return
-		}
-
-		tokenString := authHeader[7:]
-
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("méthode de signature inattendue : %v", token.Header["alg"])
-			}
-			return []byte(os.Getenv("JWT_SECRET")), nil
-		})
-
-		if err != nil || !token.Valid {
-			fmt.Println("Erreur JWT:", err)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token invalide"})
-			return
-		}
-
-		claims, ok := token.Claims.(jwt.MapClaims)
-
-		if !ok {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la lecture des claims"})
-			return
-		}
-
-		userID := int(claims["user_id"].(float64))
-
-		messageID := c.Param("id")
-
-		var deletedMessages []types.Message
-
-		_, dbErr := client.From("messages").Delete("", "representation").Eq("id", messageID).Eq("user_id", fmt.Sprintf("%d", userID)).ExecuteTo(&deletedMessages)
-
-		if dbErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": dbErr.Error()})
-			return
-		}
-
-		if len(deletedMessages) == 0 {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Message non trouvé ou vous n'avez pas les droits pour le supprimer"})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{"message": "Message supprimé"})
 	})
 
 	r.GET("/api/topics", func(c *gin.Context) {
