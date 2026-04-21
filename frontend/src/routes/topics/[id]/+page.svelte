@@ -107,6 +107,57 @@
 
 		message = '';
 	}
+
+	let contextMenu = $state({ show: false, x: 0, y: 0, messageId: null as number | null });
+
+	function handleContextMenu(event: MouseEvent, messageId: number) {
+		event.preventDefault();
+
+		contextMenu = {
+			show: true,
+			x: event.clientX,
+			y: event.clientY,
+			messageId: messageId
+		};
+	}
+
+	function closeContextMenu() {
+		contextMenu = {
+			show: false,
+			x: 0,
+			y: 0,
+			messageId: null
+		};
+	}
+
+	async function deleteMessage(messageId: number) {
+		if (!messageId) return;
+
+		try {
+			const response = await fetch(`http://localhost:8080/api/messages/${messageId}`, {
+				method: 'DELETE',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${token}`
+				}
+			});
+
+			if (!response.ok) {
+				message = 'Une erreur est survenue.';
+				isError = true;
+				return;
+			}
+
+			await fetchMessages(topicId!);
+			closeContextMenu();
+		} catch (error) {
+			message =
+				'Une erreur est survenue : ' + (error instanceof Error ? error.message : String(error));
+			isError = true;
+		}
+
+		closeContextMenu();
+	}
 </script>
 
 {#if errorStatus}
@@ -150,6 +201,9 @@
 		{#each messages as msg (msg.id)}
 			<div
 				class="group rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+				oncontextmenu={(e) => handleContextMenu(e, msg.id)}
+				role="button"
+				tabindex="0"
 			>
 				<div class="flex items-start gap-4">
 					<div
@@ -242,5 +296,35 @@
 				</div>
 			</div>
 		</div>
+	</div>
+{/if}
+
+<svelte:window onclick={closeContextMenu} onscroll={closeContextMenu} />
+
+{#if contextMenu.show}
+	<div
+		class="fixed z-50 min-w-37.5 rounded-lg border border-gray-200 bg-white py-1 shadow-xl"
+		style="top: {contextMenu.y}px; left: {contextMenu.x}px;"
+	>
+		<button
+			onclick={() => deleteMessage(contextMenu.messageId!)}
+			class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+		>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				class="h-4 w-4"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+			>
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+				/>
+			</svg>
+			Supprimer le message
+		</button>
 	</div>
 {/if}
