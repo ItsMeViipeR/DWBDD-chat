@@ -2,12 +2,23 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { isTokenExpired } from '$lib/isTokenExpired';
+	import { jwtDecode } from 'jwt-decode';
+	import type { Token } from '$lib/token';
+
 	const token = localStorage.getItem('chat_token');
+	let userId: number | null = $state(null);
+
+	if (token && !isTokenExpired(token)) {
+		userId = jwtDecode<Token>(token).user_id;
+	} else {
+		window.location.href = '/login';
+	}
 
 	interface Message {
 		id: number;
 		user: {
 			username: string;
+			id: number;
 		};
 		content: string;
 		created_at: string;
@@ -302,29 +313,35 @@
 <svelte:window onclick={closeContextMenu} onscroll={closeContextMenu} />
 
 {#if contextMenu.show}
+	{@const selectedMsg = messages.find((m) => m.id === contextMenu.messageId)}
+
 	<div
 		class="fixed z-50 min-w-37.5 rounded-lg border border-gray-200 bg-white py-1 shadow-xl"
 		style="top: {contextMenu.y}px; left: {contextMenu.x}px;"
 	>
-		<button
-			onclick={() => deleteMessage(contextMenu.messageId!)}
-			class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-		>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="h-4 w-4"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke="currentColor"
+		{#if selectedMsg && selectedMsg.user.id === userId}
+			<button
+				onclick={() => deleteMessage(contextMenu.messageId!)}
+				class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
 			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					stroke-width="2"
-					d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-				/>
-			</svg>
-			Supprimer le message
-		</button>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-4 w-4"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+					/>
+				</svg>
+				Supprimer le message
+			</button>
+		{:else}
+			<div class="px-4 py-2 text-sm text-gray-400 italic">Aucune action disponible</div>
+		{/if}
 	</div>
 {/if}
