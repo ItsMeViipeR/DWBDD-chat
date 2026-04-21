@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import { isTokenExpired } from '$lib/isTokenExpired';
+	const token = localStorage.getItem('chat_token');
 
 	interface Message {
 		id: number;
@@ -14,6 +16,9 @@
 	let topicId = $derived(page.params.id);
 	let messages: Message[] = $state([]);
 	let errorStatus: string | null = $state(null);
+	let newMessage: string = $state('');
+	let message: string = $state('');
+	let isError: boolean = $state(false);
 
 	async function fetchMessages(id: string) {
 		if (!id) return;
@@ -62,6 +67,46 @@
 	$effect(() => {
 		fetchMessages(topicId!);
 	});
+
+	async function sendMessage() {
+		if (!newMessage.trim()) return;
+		console.log('sending message', newMessage);
+
+		if (!token || isTokenExpired(token)) {
+			message = 'Veuillez vous connecter pour envoyer un message.';
+			isError = true;
+			return;
+		}
+
+		try {
+			const response = await fetch(`http://localhost:8080/api/messages`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${token}`
+				},
+				body: JSON.stringify({ topic_id: Number(topicId), content: newMessage })
+			});
+
+			if (!response.ok) {
+				message = 'Une erreur est survenue.';
+				isError = true;
+				return;
+			}
+
+			await fetchMessages(topicId!);
+
+			newMessage = '';
+			scrollTo(0, document.body.scrollHeight);
+		} catch (error) {
+			message =
+				'Une erreur est survenue : ' + (error instanceof Error ? error.message : String(error));
+			isError = true;
+			return;
+		}
+
+		message = '';
+	}
 </script>
 
 {#if errorStatus}
@@ -136,5 +181,66 @@
 				</button>
 			</div>
 		{/each}
+
+		<div class="h-36"></div>
+
+		{#if message != ''}
+			{#if isError}
+				<div class="mb-4 rounded bg-red-100 p-2 text-sm text-red-600">
+					{message}
+				</div>
+			{:else}
+				<div class="mb-4 rounded bg-green-100 p-2 text-sm text-green-600">
+					{message}
+				</div>
+			{/if}
+		{/if}
+
+		<div
+			class="fixed right-0 bottom-0 left-0 bg-linear-to-t from-white via-white/95 to-transparent px-4 pt-12 pb-6"
+		>
+			<div class="mx-auto max-w-2xl">
+				<div
+					class="relative flex items-center gap-2 rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_10px_40px_rgba(0,0,0,0.04)] transition-all duration-300 focus-within:border-indigo-400 focus-within:shadow-[0_10px_40px_rgba(79,70,229,0.08)]"
+				>
+					<textarea
+						bind:value={newMessage}
+						placeholder="Écrire une réponse..."
+						rows="1"
+						class="flex-1 resize-none border-none bg-transparent px-3 py-2.5 text-[15px] text-gray-800 placeholder-gray-400 focus:ring-0"
+						onkeydown={(e) =>
+							e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())}
+					></textarea>
+
+					<button
+						onclick={sendMessage}
+						disabled={!newMessage.trim()}
+						class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-90 disabled:bg-gray-100 disabled:text-gray-400"
+						title="Envoyer"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="currentColor"
+							class="h-5 w-5"
+						>
+							<path
+								d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z"
+							/>
+						</svg>
+					</button>
+				</div>
+
+				<div
+					class="mt-3 flex items-center justify-center gap-2 text-[11px] font-medium text-gray-500"
+				>
+					<kbd
+						class="rounded-md border border-gray-300 bg-white px-1.5 py-0.5 font-sans text-[10px] text-gray-600 shadow-sm"
+						>Entrée</kbd
+					>
+					<span class="opacity-70">pour envoyer</span>
+				</div>
+			</div>
+		</div>
 	</div>
 {/if}
