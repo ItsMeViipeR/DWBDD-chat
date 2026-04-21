@@ -337,5 +337,17 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"messages": result})
 	})
 
+	r.GET("/api/topics", func(c *gin.Context) {
+		var result []map[string]any
+		_, dbErr := client.From("topics").Select("*", "exact", false).ExecuteTo(&result)
+
+		if dbErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": dbErr.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"topics": result})
+	})
+
 	r.Run(":8080")
 }
