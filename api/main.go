@@ -41,6 +41,7 @@ func main() {
 		authGroup.DELETE("/messages/:id", DeleteMessageHandler)
 		authGroup.POST("/messages", CreateMessageHandler)
 		authGroup.POST("/change_email", CreateEmailHandler)
+		authGroup.POST("/topics", CreateTopicHandler)
 	}
 
 	r.POST("/api/register", func(c *gin.Context) {
@@ -126,59 +127,6 @@ func main() {
 			"token":   tokenString,
 			"user":    dbUser.Username,
 		})
-	})
-
-	r.POST("/api/topics", func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-
-		if len(authHeader) < 8 {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token manquant"})
-			return
-		}
-
-		tokenString := authHeader[7:]
-
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
-			return []byte(os.Getenv("JWT_SECRET")), nil
-		})
-
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token invalide"})
-			return
-		}
-
-		claims, ok := token.Claims.(jwt.MapClaims)
-
-		if !ok || !token.Valid {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token invalide"})
-			return
-		}
-
-		userID := int64(claims["user_id"].(float64))
-
-		var input types.CreateTopicInput
-
-		if err := c.ShouldBindJSON(&input); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		newTopic := types.Topic{
-			Name:        input.Name,
-			Description: input.Description,
-			CreatorID:   userID,
-		}
-
-		var result []types.Topic
-
-		_, dbErr := client.From("topics").Insert(newTopic, false, "", "", "").ExecuteTo(&result)
-
-		if dbErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": dbErr.Error()})
-			return
-		}
-
-		c.JSON(http.StatusCreated, gin.H{"message": "Topic créé avec succès", "topic": result[0]})
 	})
 
 	r.GET("/api/messages", func(c *gin.Context) {
