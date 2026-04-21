@@ -60,7 +60,7 @@
 	};
 
 	$effect(() => {
-		fetchMessages(topicId);
+		fetchMessages(topicId!);
 	});
 </script>
 
