@@ -302,7 +302,7 @@ func main() {
 	r.GET("/api/messages", func(c *gin.Context) {
 		var input types.GetMessagesInput
 
-		if err := c.ShouldBindJSON(&input); err != nil {
+		if err := c.ShouldBindQuery(&input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
