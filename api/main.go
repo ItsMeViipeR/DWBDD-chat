@@ -301,15 +301,33 @@ func main() {
 
 	r.GET("/api/messages", func(c *gin.Context) {
 		var input types.GetMessagesInput
-
 		if err := c.ShouldBindQuery(&input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		var result []types.Message
+		var topic []map[string]any
+		_, topicErr := client.From("topics").
+			Select("id", "exact", false).
+			Eq("id", fmt.Sprintf("%d", input.TopicID)).
+			ExecuteTo(&topic)
 
-		_, dbErr := client.From("messages").Select("*, user:users(id, username)", "exact", false).Eq("topic_id", fmt.Sprintf("%d", input.TopicID)).Order("created_at", &postgrest.OrderOpts{Ascending: true}).ExecuteTo(&result)
+		if topicErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la vérification du sujet"})
+			return
+		}
+
+		if len(topic) == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Le sujet demandé n'existe pas"})
+			return
+		}
+
+		var result []types.Message
+		_, dbErr := client.From("messages").
+			Select("*, user:users(id, username)", "exact", false).
+			Eq("topic_id", fmt.Sprintf("%d", input.TopicID)).
+			Order("created_at", &postgrest.OrderOpts{Ascending: true}).
+			ExecuteTo(&result)
 
 		if dbErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": dbErr.Error()})
