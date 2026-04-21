@@ -337,6 +337,57 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"messages": result})
 	})
 
+	r.DELETE("/api/messages/:id", func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+
+		if len(authHeader) < 8 || authHeader[:7] != "Bearer " {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Format de token invalide (Bearer manquant)"})
+			return
+		}
+
+		tokenString := authHeader[7:]
+
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("méthode de signature inattendue : %v", token.Header["alg"])
+			}
+			return []byte(os.Getenv("JWT_SECRET")), nil
+		})
+
+		if err != nil || !token.Valid {
+			fmt.Println("Erreur JWT:", err)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token invalide"})
+			return
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la lecture des claims"})
+			return
+		}
+
+		userID := int(claims["user_id"].(float64))
+
+		messageID := c.Param("id")
+
+		var deletedMessages []types.Message
+
+		_, dbErr := client.From("messages").Delete("", "representation").Eq("id", messageID).Eq("user_id", fmt.Sprintf("%d", userID)).ExecuteTo(&deletedMessages)
+
+		if dbErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": dbErr.Error()})
+			return
+		}
+
+		if len(deletedMessages) == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Message non trouvé ou vous n'avez pas les droits pour le supprimer"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Message supprimé"})
+	})
+
 	r.GET("/api/topics", func(c *gin.Context) {
 		var result []map[string]any
 		_, dbErr := client.From("topics").Select("*", "exact", false).ExecuteTo(&result)
