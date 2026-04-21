@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 
 	interface Message {
 		id: number;
@@ -86,7 +87,7 @@
 		<h2 class="mb-2 text-xl font-bold text-red-800">Oups !</h2>
 		<p class="text-center text-red-600">{errorStatus}</p>
 		<a
-			href="/topics"
+			href={resolve('/topics')}
 			class="mt-6 rounded-lg bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-700"
 		>
 			Retour aux sujets
